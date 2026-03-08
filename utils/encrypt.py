@@ -1,3 +1,7 @@
+# Copyright (c) 2026 TeamJB
+# Repository: https://github.com/teamjb1/teamjassbeniwal-ctrl
+# Licensed under the GNU General Public License v3.0.
+
 # crypto_ops.py
 from cryptography.hazmat.primitives import hashes as hsh
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC as PBK
@@ -19,7 +23,7 @@ def dyk(pwd=M1, slt=I1, l=16):
 
 def ecs(s):
     k = dyk()
-    n = osy.urandom(12) 
+    n = osy.urandom(12)
     cp = Cp(alg.AES(k), md.GCM(n))
     enc = cp.encryptor()
     p = s.encode()
