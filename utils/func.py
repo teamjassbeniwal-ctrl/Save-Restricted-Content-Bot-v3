@@ -1,5 +1,6 @@
-# Copyright (c) 2025 devgagan : https://github.com/devgaganin.  
-# Licensed under the GNU General Public License v3.0.  
+# Copyright (c) 2026 TeamJB
+# Repository: https://github.com/teamjb1/teamjassbeniwal-ctrl
+# Licensed under the GNU General Public License v3.0.
 # See LICENSE file in the repository root for full license text.
 
 import concurrent.futures
