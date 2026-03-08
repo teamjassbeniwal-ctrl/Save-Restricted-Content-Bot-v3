@@ -341,7 +341,7 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
     ydl_opts = {
         'outtmpl': download_path,
         'format': 'best',
-        'cookiefile': temp_cookie_path if temp_cookie_path else None,
+        'cookiefile': 'cookies/youtube.txt',
         'writethumbnail': True,
         'verbose': True,
     }
@@ -567,5 +567,6 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
