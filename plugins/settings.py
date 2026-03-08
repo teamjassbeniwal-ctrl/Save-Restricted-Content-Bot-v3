@@ -49,7 +49,7 @@ async def send_settings_message(chat_id, user_id):
             Button.inline('❌ Remove Thumbnail', b'remthumb')
         ],
         [
-            Button.url('🆘 Report Errors', 'https://t.me/team_spy_pro')
+            Button.url('🆘 Report Errors', 'https://t.me/teamjb1')
         ]
     ]
     await gf.send_message(chat_id, MESS, buttons=buttons)
@@ -267,3 +267,4 @@ async def rename_file(file, sender, edit):
         print(f"Rename error: {e}")
         return file
         
+
