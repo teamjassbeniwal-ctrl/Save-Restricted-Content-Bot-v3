@@ -79,8 +79,11 @@ def get_random_string(length=7):
  
 async def process_audio(client, event, url, cookies_env_var=None):
     cookies = None
-    if cookies_env_var:
-        cookies = cookies_env_var
+
+if cookies_env_var == "YT_COOKIES":
+    cookies = YT_COOKIES
+elif cookies_env_var == "INSTA_COOKIES":
+    cookies = INSTA_COOKIES
  
     temp_cookie_path = None
     if cookies:
@@ -317,8 +320,8 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
     logger.info(f"Received link: {url}")
      
     cookies = None
-    if cookies_env_var:
-        cookies = cookies_env_var
+if cookies_env_var:
+    cookies = cookies_env_var
  
      
     random_filename = get_random_string() + ".mp4"
@@ -567,3 +570,4 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
