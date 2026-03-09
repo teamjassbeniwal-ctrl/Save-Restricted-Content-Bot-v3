@@ -182,27 +182,30 @@ async def process_audio(client, event, url, cookies_env_var=None):
 async def handler(event):
     user_id = event.sender_id
     if user_id in ongoing_downloads:
-        await event.reply("**You already have an ongoing download. Please wait until it completes!**")
+        await event.reply("**You already have an ongoing download. Please wait!**")
         return
- 
+
     if len(event.message.text.split()) < 2:
-        await event.reply("**Usage:** `/adl <video-link>`\n\nPlease provide a valid video link!")
+        await event.reply("**Usage:** `/adl <video-link>`")
         return    
- 
+
     url = event.message.text.split()[1]
     ongoing_downloads[user_id] = True
- 
+
     try:
-        if "instagram.com" in url:
-            await process_audio(client, event, url, cookies_env_var="INSTA_COOKIES")
-        elif "youtube.com" in url or "youtu.be" in url:
-            await process_audio(client, event, url, cookies_env_var="YT_COOKIES")
-        else:
-            await process_audio(client, event, url)
+        # Wrap in a task and save it
+        task = asyncio.create_task(
+            process_audio(client, event, url, cookies_env_var="YT_COOKIES" if "youtube" in url else "INSTA_COOKIES")
+        )
+        user_tasks[user_id] = task
+        await task
+    except asyncio.CancelledError:
+        await event.reply("❌ Audio download/upload cancelled.")
     except Exception as e:
-        await event.reply(f"**An error occurred:** `{e}`")
+        await event.reply(f"**Error:** {e}")
     finally:
         ongoing_downloads.pop(user_id, None)
+        user_tasks.pop(user_id, None)
  
  
 async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_size):
@@ -232,37 +235,52 @@ def download_video(url, ydl_opts):
 @client.on(events.NewMessage(pattern="/dl"))
 async def handler(event):
     user_id = event.sender_id
- 
-     
+
     if user_id in ongoing_downloads:
-        await event.reply("**You already have an ongoing ytdlp download. Please wait until it completes!**")
+        await event.reply("**You already have an ongoing ytdlp download. Please wait!**")
         return
- 
+
     if len(event.message.text.split()) < 2:
         await event.reply("**Usage:** `/dl <video-link>`\n\nPlease provide a valid video link!")
         return    
- 
+
     url = event.message.text.split()[1]
- 
-     
+    ongoing_downloads[user_id] = True
+
     try:
-        if "instagram.com" in url:
-            await process_video(client, event, url, "INSTA_COOKIES", check_duration_and_size=False)
-        elif "youtube.com" in url or "youtu.be" in url:
-            await process_video(client, event, url, "YT_COOKIES", check_duration_and_size=True)
-        else:
-            await process_video(client, event, url, None, check_duration_and_size=False)
- 
+        # Wrap the process_video call in a task so it can be cancelled
+        task = asyncio.create_task(
+            process_video(
+                client,
+                event,
+                url,
+                "YT_COOKIES" if "youtube" in url or "youtu.be" in url else "INSTA_COOKIES" if "instagram.com" in url else None,
+                check_duration_and_size=True if "youtube" in url or "youtu.be" in url else False
+            )
+        )
+        user_tasks[user_id] = task
+        await task
+
+    except asyncio.CancelledError:
+        await event.reply("❌ Download/upload cancelled.")
     except Exception as e:
         await event.reply(f"**An error occurred:** `{e}`")
     finally:
-         
         ongoing_downloads.pop(user_id, None)
- 
- 
- 
- 
-user_progress = {}
+        user_tasks.pop(user_id, None)
+
+@client.on(events.NewMessage(pattern="/cancel"))
+async def cancel_handler(event):
+    user_id = event.sender_id
+
+    task = user_tasks.get(user_id)
+    if task:
+        task.cancel()  # Stops the ongoing download/upload
+        user_tasks.pop(user_id, None)
+        ongoing_downloads.pop(user_id, None)
+        await event.reply("❌ Your download/upload has been cancelled!")
+    else:
+        await event.reply("ℹ️ You have no ongoing download/upload.")
  
 def progress_callback(done, total, user_id):
      
@@ -457,83 +475,93 @@ async def split_and_upload_file(app, sender, file_path, caption):
         return
 
     file_size = os.path.getsize(file_path)
-    start = await app.send_message(sender, f"ℹ️ File size: {file_size / (1024 * 1024):.2f} MB")
+    start_msg = await app.send_message(sender, f"ℹ️ File size: {file_size / (1024 * 1024):.2f} MB")
 
     PART_SIZE = int(1.9 * 1024 * 1024 * 1024)  # 1.9GB
     CHUNK_SIZE = 5 * 1024 * 1024  # 5MB safe memory
 
     base_name, file_ext = os.path.splitext(file_path)
-
     part_number = 0
     written = 0
     part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
 
-    # --- Split & Upload ---
-    async with aiofiles.open(file_path, mode="rb") as f:
-        async with aiofiles.open(part_file, mode="wb") as part_f:
+    try:
+        async with aiofiles.open(file_path, mode="rb") as f:
+            async with aiofiles.open(part_file, mode="wb") as part_f:
 
-            while True:
-                chunk = await f.read(CHUNK_SIZE)
-                if not chunk:
-                    break
+                while True:
+                    # --- Check for cancellation ---
+                    task = upload_tasks.get(sender)
+                    if task and task.cancelled():
+                        raise asyncio.CancelledError
 
-                await part_f.write(chunk)
-                written += len(chunk)
+                    chunk = await f.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
 
-                if written >= PART_SIZE:
-                    await part_f.close()
+                    await part_f.write(chunk)
+                    written += len(chunk)
 
-                    edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
-                    part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+                    if written >= PART_SIZE:
+                        await part_f.close()
+                        edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+                        part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+                        thumb_file = await screenshot(part_file, 1, sender)
 
-                    # --- Generate thumbnail for this part ---
-                    thumb_file = await screenshot(part_file, 1, sender)
+                        await app.send_video(
+                            sender,
+                            video=part_file,
+                            caption=part_caption,
+                            thumb=thumb_file,
+                            supports_streaming=True,
+                            progress=progress_bar,
+                            progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                        )
 
-                    # --- Send video with thumbnail ---
-                    await app.send_video(
-                        sender,
-                        video=part_file,
-                        caption=part_caption,
-                        thumb=thumb_file,
-                        supports_streaming=True,
-                        progress=progress_bar,
-                        progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-                    )
+                        if thumb_file and os.path.exists(thumb_file):
+                            os.remove(thumb_file)
+                        os.remove(part_file)
 
-                    # --- Clean up ---
-                    if thumb_file and os.path.exists(thumb_file):
-                        os.remove(thumb_file)
-                    os.remove(part_file)
+                        # Next part
+                        part_number += 1
+                        written = 0
+                        part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
+                        part_f = await aiofiles.open(part_file, mode="wb")
 
-                    # Prepare next part
-                    part_number += 1
-                    written = 0
-                    part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
-                    part_f = await aiofiles.open(part_file, mode="wb")
+        # --- Upload last part ---
+        if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
+            edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+            part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+            thumb_file = await screenshot(part_file, 1, sender)
 
-    # --- Upload remaining last part ---
-    if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
-        edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
-        part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+            await app.send_video(
+                sender,
+                video=part_file,
+                caption=part_caption,
+                thumb=thumb_file,
+                supports_streaming=True,
+                progress=progress_bar,
+                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+            )
 
-        thumb_file = await screenshot(part_file, 1, sender)
+            if thumb_file and os.path.exists(thumb_file):
+                os.remove(thumb_file)
+            os.remove(part_file)
 
-        await app.send_video(
-            sender,
-            video=part_file,
-            caption=part_caption,
-            thumb=thumb_file,
-            supports_streaming=True,
-            progress=progress_bar,
-            progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-        )
-
-        if thumb_file and os.path.exists(thumb_file):
-            os.remove(thumb_file)
-        os.remove(part_file)
-
-    await start.delete()
-    os.remove(file_path)
+    except asyncio.CancelledError:
+        # --- Cleanup on cancel ---
+        if os.path.exists(part_file):
+            os.remove(part_file)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        await app.send_message(sender, "❌ Upload cancelled!")
+        return
+    finally:
+        await start_msg.delete()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        if sender in upload_tasks:
+            upload_tasks.pop(sender)
 
 
 # --- Progress bar template ---
@@ -639,6 +667,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
