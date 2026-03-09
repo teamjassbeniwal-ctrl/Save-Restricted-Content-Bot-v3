@@ -15,8 +15,7 @@ INST_COOKIES = """
 # write up here insta cookies
 """
 
-YTUB_COOKIES = """
-# Netscape HTTP Cookie File
+YTUB_COOKIES = """# Netscape HTTP Cookie File
 # https://curl.haxx.se/rfc/cookie_spec.html
 # This is a generated file! Do not edit.
 
