@@ -451,7 +451,6 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
         if thumbnail_file and os.path.exists(thumbnail_file):
             os.remove(thumbnail_file)
  
-
 async def split_and_upload_file(app, sender, file_path, caption):
     if not os.path.exists(file_path):
         await app.send_message(sender, "❌ File not found!")
@@ -467,78 +466,77 @@ async def split_and_upload_file(app, sender, file_path, caption):
 
     part_number = 0
     written = 0
-
     part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
 
- async with aiofiles.open(file_path, mode="rb") as f:
-    async with aiofiles.open(part_file, mode="wb") as part_f:
+    # --- Split & Upload ---
+    async with aiofiles.open(file_path, mode="rb") as f:
+        async with aiofiles.open(part_file, mode="wb") as part_f:
 
-        while True:
-            chunk = await f.read(CHUNK_SIZE)
+            while True:
+                chunk = await f.read(CHUNK_SIZE)
+                if not chunk:
+                    break
 
-            if not chunk:
-                break
+                await part_f.write(chunk)
+                written += len(chunk)
 
-            await part_f.write(chunk)
-            written += len(chunk)
+                if written >= PART_SIZE:
+                    await part_f.close()
 
-            if written >= PART_SIZE:
-                await part_f.close()
+                    edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+                    part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
 
-                edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
-                part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+                    # --- Generate thumbnail for this part ---
+                    thumb_file = await screenshot(part_file, 1, sender)
 
-                # --- Generate thumbnail for this part ---
-                thumb_file = await screenshot(part_file, 1, sender)
+                    # --- Send video with thumbnail ---
+                    await app.send_video(
+                        sender,
+                        video=part_file,
+                        caption=part_caption,
+                        thumb=thumb_file,
+                        supports_streaming=True,
+                        progress=progress_bar,
+                        progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                    )
 
-                # --- Send video with thumbnail ---
-                await app.send_video(
-                    sender,
-                    video=part_file,
-                    caption=part_caption,
-                    thumb=thumb_file,  # thumbnail attached
-                    supports_streaming=True,
-                    progress=progress_bar,
-                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-                )
+                    # --- Clean up ---
+                    if thumb_file and os.path.exists(thumb_file):
+                        os.remove(thumb_file)
+                    os.remove(part_file)
 
-                # --- Clean up ---
-                if thumb_file and os.path.exists(thumb_file):
-                    os.remove(thumb_file)
-                os.remove(part_file)
+                    # Prepare next part
+                    part_number += 1
+                    written = 0
+                    part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
+                    part_f = await aiofiles.open(part_file, mode="wb")
 
-                part_number += 1
-                written = 0
-                part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
-                part_f = await aiofiles.open(part_file, mode="wb")
+    # --- Upload remaining last part ---
+    if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
+        edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+        part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
 
-# Upload last remaining part
-if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
-    edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
-    part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+        thumb_file = await screenshot(part_file, 1, sender)
 
-    # --- Generate thumbnail for last part ---
-    thumb_file = await screenshot(part_file, 1, sender)
+        await app.send_video(
+            sender,
+            video=part_file,
+            caption=part_caption,
+            thumb=thumb_file,
+            supports_streaming=True,
+            progress=progress_bar,
+            progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+        )
 
-    # --- Send video with thumbnail ---
-    await app.send_video(
-        sender,
-        video=part_file,
-        caption=part_caption,
-        thumb=thumb_file,  # thumbnail attached
-        supports_streaming=True,
-        progress=progress_bar,
-        progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-    )
+        if thumb_file and os.path.exists(thumb_file):
+            os.remove(thumb_file)
+        os.remove(part_file)
 
-    # --- Clean up ---
-    if thumb_file and os.path.exists(thumb_file):
-        os.remove(thumb_file)
-    os.remove(part_file)
+    await start.delete()
+    os.remove(file_path)
 
-await start.delete()
-os.remove(file_path)
 
+# --- Progress bar template ---
 PROGRESS_BAR = """
 │ Completed: {1}/{2}
 │ Bytes: {0}%
@@ -641,6 +639,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
