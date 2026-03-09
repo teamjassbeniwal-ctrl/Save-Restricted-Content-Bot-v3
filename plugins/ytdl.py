@@ -104,6 +104,7 @@ async def process_audio(client, event, url, cookies_env_var=None):
     'quiet': False,
     'noplaylist': True,
     'js_runtimes': {'node': {}},
+    'remote_components': ['ejs:github'],
     'extractor_args': {
         'youtube': {
             'player_client': ['android', 'web']
@@ -359,6 +360,7 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
     'verbose': True,
     'noplaylist': True,
     'js_runtimes': {'node': {}},
+    'remote_components': ['ejs:github'],
     'extractor_args': {
         'youtube': {
             'player_client': ['android', 'web']
@@ -590,6 +592,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
