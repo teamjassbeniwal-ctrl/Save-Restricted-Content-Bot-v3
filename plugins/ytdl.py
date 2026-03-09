@@ -93,12 +93,20 @@ async def process_audio(client, event, url, cookies_env_var=None):
     download_path = f"{random_filename}.mp3"
  
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': f"{random_filename}.%(ext)s",
-        "cookiefile": "cookies/youtube.txt",
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-        'quiet': False,
-        'noplaylist': True,
+    'outtmpl': download_path,
+    'format': 'bv*+ba/b',
+    'cookiefile': temp_cookie_path if temp_cookie_path else 'cookies/youtube.txt',
+    'writethumbnail': True,
+    'quiet': True,
+    'sleep_interval': 2,
+    'max_sleep_interval': 5,
+    'retries': 10,
+    'fragment_retries': 10,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    }
     }
     prog = None
  
@@ -567,6 +575,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
