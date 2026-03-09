@@ -93,12 +93,25 @@ async def process_audio(client, event, url, cookies_env_var=None):
     download_path = f"{random_filename}.mp3"
  
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': f"{random_filename}.%(ext)s",
-        'cookiefile': '/app/cookies/youtube.txt', #temp_cookie_path,
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-        'quiet': False,
-        'noplaylist': True,
+    'format': 'bestaudio/best',
+    'outtmpl': f"{random_filename}.%(ext)s",
+    'cookiefile': '/app/cookies/youtube.txt',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192'
+    }],
+    'quiet': False,
+    'noplaylist': True,
+    'js_runtimes': {'node': 'node'},
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    },
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
     }
     prog = None
  
@@ -339,11 +352,21 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
  
      
     ydl_opts = {
-        'outtmpl': download_path,
-        'format': 'best',
-        'cookiefile': '/app/cookies/youtube.txt',#temp_cookie_path if temp_cookie_path else None,
-        'writethumbnail': True,
-        'verbose': True,
+    'outtmpl': download_path,
+    'format': 'bv*+ba/b',
+    'cookiefile': '/app/cookies/youtube.txt',
+    'writethumbnail': True,
+    'verbose': True,
+    'noplaylist': True,
+    'js_runtimes': {'node': 'node'},
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    },
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
     }
     prog = None
     progress_message = await event.reply("**__Starting download...__**")
@@ -567,5 +590,6 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
