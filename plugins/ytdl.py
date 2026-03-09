@@ -488,10 +488,11 @@ async def split_and_upload_file(app, sender, file_path, caption):
                     edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
                     part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
 
-                    await app.send_document(
+                    app.send_video(
                         sender,
-                        document=part_file,
+                        video=part_file,
                         caption=part_caption,
+                        supports_streaming=True,
                         progress=progress_bar,
                         progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
                     )
@@ -509,9 +510,9 @@ async def split_and_upload_file(app, sender, file_path, caption):
         edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
         part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
 
-        await app.send_document(
+        await app.send_video(
             sender,
-            document=part_file,
+            video=part_file,
             caption=part_caption,
             progress=progress_bar,
             progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
@@ -626,6 +627,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
