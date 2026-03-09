@@ -325,13 +325,13 @@ def progress_callback(done, total, user_id):
 async def process_video(client, event, url, cookies_env_var, check_duration_and_size=False):
     start_time = time.time()
     logger.info(f"Received link: {url}")
-     
+
     cookies = None
 
-if cookies_env_var == "YT_COOKIES":
-    cookies = YT_COOKIES
-elif cookies_env_var == "INSTA_COOKIES":
-    cookies = INSTA_COOKIES
+    if cookies_env_var == "YT_COOKIES":
+        cookies = YT_COOKIES
+    elif cookies_env_var == "INSTA_COOKIES":
+        cookies = INSTA_COOKIES
  
      
     random_filename = get_random_string() + ".mp4"
@@ -579,8 +579,7 @@ def convert(seconds: int) -> str:
     """
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    return f"{hours}:{minutes:02d}:{seconds:02d}"
-
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
 
