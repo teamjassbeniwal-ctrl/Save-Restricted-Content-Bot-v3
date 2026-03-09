@@ -457,44 +457,76 @@ async def split_and_upload_file(app, sender, file_path, caption):
 
     file_size = os.path.getsize(file_path)
     start = await app.send_message(sender, f"ℹ️ File size: {file_size / (1024 * 1024):.2f} MB")
-    PART_SIZE = int(1.9 * 1024 * 1024 * 1024)
+
+    PART_SIZE = int(1.9 * 1024 * 1024 * 1024)  # 1.9GB
+    CHUNK_SIZE = 5 * 1024 * 1024  # 5MB safe memory
+
+    base_name, file_ext = os.path.splitext(file_path)
 
     part_number = 0
+    written = 0
+
+    part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
+
     async with aiofiles.open(file_path, mode="rb") as f:
-        while True:
-            chunk = await f.read(PART_SIZE)
-            if not chunk:
-                break
+        async with aiofiles.open(part_file, mode="wb") as part_f:
 
-            # Create part filename
-            base_name, file_ext = os.path.splitext(file_path)
-            part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
+            while True:
+                chunk = await f.read(CHUNK_SIZE)
 
-            # Write part to file
-            async with aiofiles.open(part_file, mode="wb") as part_f:
+                if not chunk:
+                    break
+
                 await part_f.write(chunk)
+                written += len(chunk)
 
-            # Uploading part
-            edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
-            part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
-            await app.send_document(sender, document=part_file, caption=part_caption,
-                progress=progress_bar,
-                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-            )
-            await edit.delete()
-            os.remove(part_file)
+                if written >= PART_SIZE:
+                    await part_f.close()
 
-            part_number += 1
+                    edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+                    part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+
+                    await app.send_document(
+                        sender,
+                        document=part_file,
+                        caption=part_caption,
+                        progress=progress_bar,
+                        progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                    )
+
+                    await edit.delete()
+                    os.remove(part_file)
+
+                    part_number += 1
+                    written = 0
+                    part_file = f"{base_name}.part{str(part_number).zfill(3)}{file_ext}"
+                    part_f = await aiofiles.open(part_file, mode="wb")
+
+    # Upload last remaining part
+    if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
+        edit = await app.send_message(sender, f"⬆️ Uploading part {part_number + 1}...")
+        part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
+
+        await app.send_document(
+            sender,
+            document=part_file,
+            caption=part_caption,
+            progress=progress_bar,
+            progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+        )
+
+        await edit.delete()
+        os.remove(part_file)
 
     await start.delete()
     os.remove(file_path)
 
 
 PROGRESS_BAR = """
-│ **__Completed:__** {1}/{2}
-│ **__Bytes:__** {0}%
-│ **__Speed:__** {3}/s
-│ **__ETA:__** {4}
+│ Completed: {1}/{2}
+│ Bytes: {0}%
+│ Speed: {3}/s
+│ ETA: {4}
 ╰─────────────────────╯
 """
 
@@ -592,6 +624,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
