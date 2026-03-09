@@ -80,10 +80,10 @@ def get_random_string(length=7):
 async def process_audio(client, event, url, cookies_env_var=None):
     cookies = None
 
-if cookies_env_var == "YT_COOKIES":
-    cookies = YT_COOKIES
-elif cookies_env_var == "INSTA_COOKIES":
-    cookies = INSTA_COOKIES
+    if cookies_env_var == "YT_COOKIES":
+        cookies = YT_COOKIES
+    elif cookies_env_var == "INSTA_COOKIES":
+        cookies = INSTA_COOKIES
  
     temp_cookie_path = None
     if cookies:
@@ -580,6 +580,7 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
 
