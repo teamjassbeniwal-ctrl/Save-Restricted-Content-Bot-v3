@@ -314,91 +314,91 @@ def progress_callback(done, total, user_id):
     user_data['previous_time'] = time.time()
  
     return final
- 
+
 async def process_video(client, event, url, cookies_env_var, check_duration_and_size=False):
     start_time = time.time()
     logger.info(f"Received link: {url}")
-     
+
     cookies = None
-if cookies_env_var:
-    cookies = cookies_env_var
- 
-     
+    if cookies_env_var == "YT_COOKIES":
+        cookies = YT_COOKIES
+    elif cookies_env_var == "INSTA_COOKIES":
+        cookies = INSTA_COOKIES
+
     random_filename = get_random_string() + ".mp4"
     download_path = os.path.abspath(random_filename)
     logger.info(f"Generated random download path: {download_path}")
- 
-     
+
     temp_cookie_path = None
     if cookies:
         with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt') as temp_cookie_file:
             temp_cookie_file.write(cookies)
             temp_cookie_path = temp_cookie_file.name
-        logger.info(f"Created temporary cookie file at: {temp_cookie_path}")
- 
-     
+
     thumbnail_file = None
-    metadata = {'width': None, 'height': None, 'duration': None, 'thumbnail': None}
- 
-     
+    metadata = {'width': None, 'height': None, 'duration': None}
+
     ydl_opts = {
         'outtmpl': download_path,
         'format': 'best',
         'cookiefile': temp_cookie_path if temp_cookie_path else None,
         'writethumbnail': True,
-        'verbose': True,
+        'quiet': True
     }
-    prog = None
+
     progress_message = await event.reply("**__Starting download...__**")
-    logger.info("Starting the download process...")
+
     try:
+
         info_dict = await fetch_video_info(url, ydl_opts, progress_message, check_duration_and_size)
         if not info_dict:
             return
-         
+
         await asyncio.to_thread(download_video, url, ydl_opts)
+
         title = info_dict.get('title', 'Powered by Team SPY')
-        k = await get_video_metadata(download_path)      
+
+        k = await get_video_metadata(download_path)
+
         W = k['width']
         H = k['height']
         D = k['duration']
+
         metadata['width'] = info_dict.get('width') or W
         metadata['height'] = info_dict.get('height') or H
         metadata['duration'] = int(info_dict.get('duration') or 0) or D
-        thumbnail_url = info_dict.get('thumbnail', None)
+
+        thumbnail_url = info_dict.get('thumbnail')
+
         THUMB = None
- 
-         
+
         if thumbnail_url:
             thumbnail_file = os.path.join(tempfile.gettempdir(), get_random_string() + ".jpg")
             downloaded_thumb = d_thumbnail(thumbnail_url, thumbnail_file)
             if downloaded_thumb:
-                logger.info(f"Thumbnail saved at: {downloaded_thumb}")
- 
-        if thumbnail_file:
-            THUMB = thumbnail_file
-        else:
+                THUMB = downloaded_thumb
+
+        if not THUMB:
             THUMB = await screenshot(download_path, metadata['duration'], event.sender_id)
 
         chat_id = event.chat_id
         SIZE = 2 * 1024 * 1024
-        caption = f"{title}"
-     
-        if os.path.exists(download_path) and os.path.getsize(download_path) > SIZE:
-            prog = await client.send_message(chat_id, "**__Starting Upload...__**")
-            await split_and_upload_file(app, chat_id, download_path, caption)
-            await prog.delete()
-         
+
         if os.path.exists(download_path):
+
             await progress_message.delete()
-            prog = await client.send_message(chat_id, "**__Starting Upload...__**")
+
+            prog = await client.send_message(chat_id, "**__Uploading Video...__**")
+
             uploaded = await fast_upload(
-                client, download_path,
+                client,
+                download_path,
                 reply=prog,
                 progress_bar_function=lambda done, total: progress_callback(done, total, chat_id)
             )
+
             await client.send_file(
-                event.chat_id,
+                chat_id,
                 uploaded,
                 caption=f"**{title}**",
                 attributes=[
@@ -409,24 +409,28 @@ if cookies_env_var:
                         supports_streaming=True
                     )
                 ],
-                thumb=THUMB if THUMB else None
+                thumb=THUMB
             )
-            if prog:
-                await prog.delete()
+
+            await prog.delete()
+
         else:
-            await event.reply("**__File not found after download. Something went wrong!__**")
+            await event.reply("**__File not found after download.__**")
+
     except Exception as e:
-        logger.exception("An error occurred during download or upload.")
-        await event.reply(f"**__An error occurred: {e}__**")
+        logger.exception("Download error")
+        await event.reply(f"**Error:** `{e}`")
+
     finally:
-         
+
         if os.path.exists(download_path):
             os.remove(download_path)
+
         if temp_cookie_path and os.path.exists(temp_cookie_path):
             os.remove(temp_cookie_path)
+
         if thumbnail_file and os.path.exists(thumbnail_file):
             os.remove(thumbnail_file)
- 
 
 async def split_and_upload_file(app, sender, file_path, caption):
     if not os.path.exists(file_path):
@@ -570,5 +574,6 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
 
 
