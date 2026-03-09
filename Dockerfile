@@ -1,5 +1,6 @@
 FROM python:3.10-slim
 
+# Install system packages
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -9,19 +10,27 @@ RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
     ca-certificates \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
+# Copy requirements first (better caching)
 COPY requirements.txt .
 
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install -U yt-dlp
 
+# Copy project files
 COPY . .
 
+# Environment
 ENV PYTHONUNBUFFERED=1
 
+# Expose port for Flask health check
 EXPOSE 5000
 
-CMD ["bash","-c","flask run -h 0.0.0.0 -p 5000 & python3 main.py"]
+# Start services
+CMD ["bash", "-c", "flask run --host=0.0.0.0 --port=5000 & python3 main.py"]
