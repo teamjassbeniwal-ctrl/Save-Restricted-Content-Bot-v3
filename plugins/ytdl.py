@@ -95,7 +95,7 @@ async def process_audio(client, event, url, cookies_env_var=None):
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': f"{random_filename}.%(ext)s",
-        'cookiefile': temp_cookie_path,
+        'cookiefile': r"cookies\youtube.txt", #temp_cookie_path,
         'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
         'quiet': False,
         'noplaylist': True,
@@ -341,7 +341,7 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
     ydl_opts = {
         'outtmpl': download_path,
         'format': 'best',
-        'cookiefile': temp_cookie_path if temp_cookie_path else None,
+        'cookiefile': r"cookies\youtube.txt", #temp_cookie_path if temp_cookie_path else None,
         'writethumbnail': True,
         'verbose': True,
     }
@@ -567,3 +567,4 @@ def convert(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
